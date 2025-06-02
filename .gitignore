@@ -1,50 +1,24 @@
-# Node.js
-node_modules/
+# Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+pnpm-debug.log*
+lerna-debug.log*
 
-# Logs
-logs/
-*.log
+node_modules
+dist
+dist-ssr
+*.local
 
-# Dependency directories
-Frontend/node_modules/
-Backend/node_modules/
-
-# Build files
-dist/
-build/
-Frontend/build/
-Frontend/dist/
-
-# OS-specific files
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-Thumbs.db
-
-# IDE-specific files
-.vscode/
-.idea/
-
-# React testing
-coverage/
-*.lcov
-
-# Optional: ignore database dumps
-*.dump
-*.sql
-*.sqlite
-
-# Optional: ignore uploads (if applicable)
-uploads/
-
-# Optional: local MongoDB data
-/data/db/
-
-
-/node_modules
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
