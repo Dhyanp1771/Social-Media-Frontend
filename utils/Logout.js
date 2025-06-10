@@ -1,6 +1,5 @@
-import axios from "axios";
+import axios from 'axios';
 
 export const logout = async () => {
-  await axios.post("/api/auth/logout", {}, { withCredentials: true });
+  await axios.post('/api/auth/logout', {}, { withCredentials: true });
 };
-        
