@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import LikeButton from './LikeButton';
 import Search from './Search';
+import { toast } from 'react-toastify';
 
 const Posts = () => {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loggedInUserId, setLoggedInUserId] = useState(null);
+  const [showComments, setShowComments] = useState({});
+  const [commentContent, setCommentContent] = useState({});
 
   useEffect(() => {
     const userId = localStorage.getItem('userid');
@@ -31,6 +34,19 @@ const Posts = () => {
     }
   };
 
+  const fetchPostComments = async (postId, token) => {
+    try {
+      const { data } = await axios.get(`http://localhost:5000/api/posts/${postId}/comments`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return data || [];
+    } catch (error) {
+      console.error(`Failed to fetch comments for post ${postId}:`, error);
+      toast.error('Failed to load comments');
+      return [];
+    }
+  };
+
   const fetchPosts = async () => {
     const token = localStorage.getItem('token');
     const userId = localStorage.getItem('userid') || '';
@@ -44,7 +60,7 @@ const Posts = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log('API response:', data); // Debug API response
+      console.log('API response:', data);
 
       if (!Array.isArray(data)) {
         console.error('API response is not an array:', data);
@@ -69,6 +85,7 @@ const Posts = () => {
                 username: post.author?.username || 'Unknown User',
                 avatar: post.author?.avatar || '/default-avatar.png',
               },
+              comments: [], // Initialize empty comments (fetched on-demand)
             };
           })
       );
@@ -86,7 +103,7 @@ const Posts = () => {
   };
 
   const handleLikeChange = (postId, isLiked, newCount) => {
-    console.log('Like change:', { postId, isLiked, newCount }); // Debug
+    console.log('Like change:', { postId, isLiked, newCount });
     setPosts(prev =>
       prev.map(post =>
         post.id === postId
@@ -98,6 +115,71 @@ const Posts = () => {
           : post
       )
     );
+  };
+
+  const handleCommentToggle = async (postId) => {
+    setShowComments(prev => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+    if (!showComments[postId]) {
+      const token = localStorage.getItem('token');
+      const comments = await fetchPostComments(postId, token);
+      setPosts(prev =>
+        prev.map(post =>
+          post.id === postId ? { ...post, comments } : post
+        )
+      );
+    }
+  };
+
+  const handleCommentChange = (postId, value) => {
+    setCommentContent(prev => ({
+      ...prev,
+      [postId]: value,
+    }));
+  };
+
+  const handleCommentSubmit = async (postId) => {
+    const token = localStorage.getItem('token');
+    const content = commentContent[postId]?.trim();
+    if (!token) {
+      toast.error('Please log in to comment');
+      return;
+    }
+    if (!content) {
+      toast.warning('Comment cannot be empty');
+      return;
+    }
+
+    try {
+      const { data } = await axios.post(
+        `http://localhost:5000/api/posts/${postId}/comments`,
+        { content },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setPosts(prev =>
+        prev.map(post =>
+          post.id === postId
+            ? {
+                ...post,
+                comments: [...(post.comments || []), data],
+                _count: { ...post._count, comments: (post._count.comments || 0) + 1 },
+              }
+            : post
+        )
+      );
+      setCommentContent(prev => ({ ...prev, [postId]: '' }));
+      toast.success('Comment added');
+    } catch (error) {
+      console.error('Comment submit error:', error);
+      if (error.response?.status === 403) {
+        toast.warning('You must follow the user to comment');
+      } else {
+        toast.error('Failed to add comment');
+      }
+    }
   };
 
   if (loading) {
@@ -177,22 +259,27 @@ const Posts = () => {
                           initialCount={post._count?.likes || 0}
                           onLikeChange={handleLikeChange}
                         />
-                        <div className="flex items-center gap-1 text-gray-500">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleCommentToggle(post.id)}
+                            className="text-gray-500 hover:text-gray-700"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                            />
-                          </svg>
-                          <span className="text-sm">{post._count?.comments || 0}</span>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                              />
+                            </svg>
+                          </button>
+                          <span className="text-sm text-gray-600">{post._count?.comments || 0}</span>
                         </div>
                       </div>
                       <button className="text-gray-500 hover:text-gray-700">
@@ -212,13 +299,57 @@ const Posts = () => {
                         </svg>
                       </button>
                     </div>
+
+                    {showComments[post.id] && (
+                      <div className="p-4 border-t border-gray-100">
+                        <div className="mb-4">
+                          <textarea
+                            value={commentContent[post.id] || ''}
+                            onChange={e => handleCommentChange(post.id, e.target.value)}
+                            placeholder="Add a comment..."
+                            className="w-full p-2 border rounded-md text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            rows={2}
+                          />
+                          <button
+                            onClick={() => handleCommentSubmit(post.id)}
+                            className="mt-2 px-4 py-1 bg-gray-800 text-white rounded-md hover:bg-gray-700 text-sm"
+                          >
+                            Post Comment
+                          </button>
+                        </div>
+                        {post.comments?.length > 0 ? (
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {post.comments.map(comment => (
+                              <div key={comment.id} className="flex items-start gap-2">
+                                <img
+                                  src={comment.author.avatar || '/default-avatar.png'}
+                                  alt={comment.author.username}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-800">
+                                    {comment.author.username}
+                                  </p>
+                                  <p className="text-sm text-gray-600">{comment.content}</p>
+                                  <p className="text-xs text-gray-400">
+                                    {new Date(comment.createdAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">No comments yet</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="mx-auto w-16 h-16 rounded-full border-2 border-gray-300 flex items-center justify-center mb-4">
+              <div className="mx-auto w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center mb-4">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-8 w-8 text-gray-400"
